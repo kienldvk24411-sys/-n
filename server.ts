@@ -6,13 +6,40 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
-dotenv.config();
+const envConfig = dotenv.config();
+
+if (envConfig.error) {
+  console.error("❌ LỖI: Không thể nạp file .env:", envConfig.error.message);
+}
+
+const dbUrl = process.env.DATABASE_URL;
+
+if (!dbUrl) {
+  console.error("❌ LỖI: Biến DATABASE_URL đang bị trống (undefined).");
+  console.log("--- Thông tin chẩn đoán ---");
+  console.log("Vị trí file hiện tại:", process.cwd());
+  console.log("Các biến môi trường đã nạp:", Object.keys(envConfig.parsed || {}));
+  console.error("---------------------------");
+  console.error("HƯỚNG DẪN: Hãy chạy lệnh sau trong Terminal để tạo lại file .env chuẩn:");
+  console.error('echo "DATABASE_URL=postgresql://postgres:pass@localhost:5432/db" > .env');
+  process.exit(1);
+}
+
+// Kiểm tra lỗi SASL (mật khẩu trống)
+if (dbUrl.includes(": @") || dbUrl.endsWith(":@") || !dbUrl.includes("://") || !dbUrl.includes(":")) {
+  console.error("❌ LỖI: Chuỗi DATABASE_URL không đúng định dạng hoặc thiếu mật khẩu!");
+  console.error("Giá trị hiện tại:", dbUrl.replace(/:([^@]+)@/, ":****@")); // Ẩn mật khẩu khi log
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: dbUrl,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Initialize Database
@@ -955,9 +982,9 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
